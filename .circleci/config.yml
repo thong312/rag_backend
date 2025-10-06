@@ -48,7 +48,7 @@ workflows:
               only: main
 
 commands:
-  openSettings:
+  open-settings:
     description: "Open CircleCI settings"
     parameters:
       key:
@@ -62,4 +62,3 @@ commands:
           name: Open CircleCI Settings
           command: |
             echo "Opening CircleCI settings: ${key} = ${value}"
-            # Add command to open CircleCI settings here
