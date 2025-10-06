@@ -46,3 +46,20 @@ workflows:
           filters:
             branches:
               only: main
+
+commands:
+  openSettings:
+    description: "Open CircleCI settings"
+    parameters:
+      key:
+        type: string
+        description: "The key of the setting to open"
+      value:
+        type: string
+        description: "The value of the setting to open"
+    steps:
+      - run:
+          name: Open CircleCI Settings
+          command: |
+            echo "Opening CircleCI settings: ${key} = ${value}"
+            # Add command to open CircleCI settings here
