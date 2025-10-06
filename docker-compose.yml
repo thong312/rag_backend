@@ -20,7 +20,7 @@ services:
               capabilities: [gpu]
 
   app:
-    build: .
+    image: 601973176417.dkr.ecr.us-east-1.amazonaws.com/rag-backend:latest  
     ports:
       - "8080:8080"
     restart: unless-stopped  
