@@ -1,0 +1,30 @@
+---
+- name: Deploy RAG Application
+  hosts: localhost
+  tasks:
+    - name: Stop existing containers
+      docker_compose:
+        project_src: "{{ playbook_dir }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Pull latest images
+      docker_compose:
+        project_src: "{{ playbook_dir }}"
+        pull: yes
+      
+    - name: Start services
+      docker_compose:
+        project_src: "{{ playbook_dir }}"
+        state: present
+        build: yes
+
+    - name: Verify services are running
+      docker_compose:
+        project_src: "{{ playbook_dir }}"
+        services:
+          - app
+          - qdrant
+          - minio
+          - redis
+          - mlflow  

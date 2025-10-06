@@ -1,0 +1,82 @@
+---
+- name: Deploy RAG Application
+  hosts: rag_servers
+  become: yes
+  vars:
+    app_dir: /opt/rag-app
+    docker_compose_version: "2.21.0"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+        state: present
+
+    - name: Install Docker
+      block:
+        - name: Add Docker GPG apt Key
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Add Docker Repository
+          apt_repository:
+            repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+            state: present
+
+        - name: Install Docker packages
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-Linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy application files
+      copy:
+        src: ./
+        dest: "{{ app_dir }}"
+        mode: '0644'
+
+    - name: Copy Docker Compose file
+      template:
+        src: docker-compose.yml.j2
+        dest: "{{ app_dir }}/docker-compose.yml"
+
+    - name: Create data directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - "{{ app_dir }}/qdrant_data"
+        - "{{ app_dir }}/minio_data"
+        - "{{ app_dir }}/redis_data"
+        - "{{ app_dir }}/mlruns"
+
+    - name: Start Docker services
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        state: present

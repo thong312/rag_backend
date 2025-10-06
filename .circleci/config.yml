@@ -1,0 +1,48 @@
+version: 2.1
+
+orbs:
+  aws-ecr: circleci/aws-ecr@8.1
+  aws-cli: circleci/aws-cli@3.1
+  terraform: circleci/terraform@3.2
+
+jobs:
+  deploy:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - setup_remote_docker
+      - aws-cli/setup
+      - terraform/install
+      
+      # Build and push Docker image
+      - aws-ecr/build-and-push-image:
+          repo: ${ECR_REPOSITORY}
+          tag: 'latest'
+      
+      # Initialize and apply Terraform
+      - run:
+          name: Terraform Init and Apply
+          command: |
+            terraform init
+            terraform apply -auto-approve
+      
+      # Deploy with Ansible
+      - run:
+          name: Install Ansible
+          command: |
+            pip install ansible
+            
+      - run:
+          name: Deploy with Ansible
+          command: |
+            ansible-playbook -i inventory.ini site.yml
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - deploy:
+          filters:
+            branches:
+              only: main
