@@ -28,7 +28,7 @@ jobs:
           repo: ${ECR_REPOSITORY}
           tag: 'latest'
           region: ${AWS_REGION}
-          registry-id: ${AWS_ACCOUNT_ID}
+          registry-id: AWS_ACCOUNT_ID
       
       # Initialize and apply Terraform
       - run:
