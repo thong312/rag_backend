@@ -119,3 +119,43 @@ resource "aws_volume_attachment" "model_attach" {
   volume_id   = aws_ebs_volume.model_storage.id
   instance_id = aws_instance.rag_server.id
 }
+
+# Add ECR Repository
+resource "aws_ecr_repository" "rag_backend" {
+  name                 = var.ecr_repository
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+# Add ECR Repository Policy
+resource "aws_ecr_repository_policy" "rag_backend_policy" {
+  repository = aws_ecr_repository.rag_backend.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowPushPull"
+        Effect = "Allow"
+        Principal = {
+          AWS = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+        }
+        Action = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload"
+        ]
+      }
+    ]
+  })
+}
+
+# Get current AWS account ID
+data "aws_caller_identity" "current" {}
