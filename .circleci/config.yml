@@ -25,10 +25,10 @@ jobs:
 
       # Build and push Docker image with explicit region and registry
       - aws-ecr/build-and-push-image:
-          repo: ${ECR_REPOSITORY}
+          repo: ECR_REPOSITORY
           tag: 'latest'
-          region: ${AWS_REGION}
-          registry-id: ${AWS_ACCOUNT_ID}
+          region: AWS_REGION
+          registry-id: AWS_ACCOUNT_ID
       
       # Initialize and apply Terraform
       - run:
