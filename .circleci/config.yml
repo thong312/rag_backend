@@ -1,6 +1,7 @@
 version: 2.1
 
 orbs:
+  aws-ecr: circleci/aws-ecr@8.1
   aws-cli: circleci/aws-cli@3.1
   terraform: circleci/terraform@3.2
 
@@ -8,109 +9,47 @@ jobs:
   deploy:
     docker:
       - image: cimg/python:3.12
-    environment:
-      AWS_DEFAULT_REGION: << pipeline.parameters.aws_region >>
     steps:
       - checkout
-
-      # enable docker
-      - setup_remote_docker:
-          docker_layer_caching: true
-
-      # Install awscli v2 (orb provides helper but we'll ensure aws available)
+      - setup_remote_docker
       - aws-cli/setup
-
-      # Install docker client (already in remote docker environment), install terraform (orb)
-      - terraform/install:
-          terraform_version: "1.8.5"
-
-      - run:
-          name: Install dependencies (ansible, jq)
-          command: |
-            python3 -m pip install --upgrade pip
-            pip3 install ansible==7.4.0
-            sudo apt-get update -y
-            sudo apt-get install -y jq
-
-      # Ensure ECR repository exists
-      - run:
-          name: Ensure ECR repository exists
-          command: |
-            set -eo pipefail
-            echo "Using AWS_REGION=$AWS_REGION, ACCOUNT=$AWS_ACCOUNT_ID, REPO=$ECR_REPOSITORY"
-            aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" \
-              || aws ecr create-repository --repository-name "$ECR_REPOSITORY" --region "$AWS_REGION"
-
-      # Docker login to ECR
+      - terraform/install
+      
+      # Add ECR authentication steps
       - run:
           name: Login to ECR
           command: |
-            set -eo pipefail
-            aws ecr get-login-password --region "$AWS_REGION" \
-              | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+            echo "Logging in to ECR..."
+            aws ecr get-login-password --region $AWS_REGION \
+              | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      # Build and push image (tag uses git SHA)
+      # Build and push Docker image with explicit region and registry
+      - aws-ecr/build-and-push-image:
+          repo: ${ECR_REPOSITORY}
+          tag: 'latest'
+          region: ${AWS_REGION}
+          registry-id: AWS_ACCOUNT_ID
+      
+      # Initialize and apply Terraform
       - run:
-          name: Build and push Docker image to ECR
+          name: Terraform Init and Apply
           command: |
-            set -eo pipefail
-            IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${CIRCLE_SHA1:-latest}"
-            echo "Building $IMAGE"
-            docker build -t "$IMAGE" .
-            docker push "$IMAGE"
-            echo "export IMAGE=$IMAGE" >> $BASH_ENV
-
-      # Terraform init & apply (assumes terraform configs are in ./terraform)
+            terraform init
+            terraform apply -auto-approve
+      
+      # Deploy with Ansible
       - run:
-          name: Terraform Init & Apply
-          working_directory: terraform
+          name: Install Ansible
           command: |
-            set -eo pipefail
-            terraform init -input=false
-            terraform apply -auto-approve -input=false \
-              -var="ecr_registry=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" \
-              -var="ecr_repository=${ECR_REPOSITORY}" \
-              -var="image_tag=${CIRCLE_SHA1:-latest}"
-
-      # Generate inventory.ini from terraform output (requires terraform output named rag_server_ip)
+            pip install ansible
+            
       - run:
-          name: Generate inventory.ini
-          working_directory: terraform
+          name: Deploy with Ansible
           command: |
-            set -eo pipefail
-            echo "Fetching EC2 public IP from terraform output..."
-            SERVER_IP=$(terraform output -raw rag_server_ip)
-            echo "Server IP: $SERVER_IP"
-            cat > ../inventory.ini <<EOF
-[rag_servers]
-rag-app ansible_host=${SERVER_IP} ansible_user=ubuntu ansible_ssh_private_key_file=./rag-key.pem
-
-[all:vars]
-ansible_python_interpreter=/usr/bin/python3
-EOF
-            ls -l ../inventory.ini
-            sed -n '1,120p' ../inventory.ini
-
-      # Ensure SSH key exists and has correct perms (you may want to store this as an artifact or add via CircleCI SSH)
-      - run:
-          name: Prepare SSH key
-          command: |
-            set -eo pipefail
-            # If key is stored in project repo at root, ensure perms - otherwise fetch from CircleCI secure storage
-            if [ -f ./rag-key.pem ]; then
-              chmod 600 ./rag-key.pem
-            else
-              echo "Warning: ./rag-key.pem not found. Ensure SSH key is available for Ansible to connect."
-            fi
-
-      # Run ansible-playbook (assumes site.yml at repo root)
-      - run:
-          name: Run Ansible Playbook
-          command: |
-            set -eo pipefail
-            ansible-playbook -i inventory.ini site.yml -vv
+            ansible-playbook -i inventory.ini site.yml
 
 workflows:
+  version: 2
   build-deploy:
     jobs:
       - deploy:
@@ -118,8 +57,18 @@ workflows:
             branches:
               only: main
 
-# allow overriding region if needed
-parameters:
-  aws_region:
-    type: string
-    default: "us-east-1"
+commands:
+  open-settings:
+    description: "Open CircleCI settings"
+    parameters:
+      key:
+        type: string
+        description: "The key of the setting to open"
+      value:
+        type: string
+        description: "The value of the setting to open"
+    steps:
+      - run:
+          name: Open CircleCI Settings
+          command: |
+            echo "Opening CircleCI settings: ${key} = ${value}"
