@@ -2,7 +2,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-resource "aws_instance" "rag_server" {
+resource "aws_instance" "rag_backend" {
   ami           = var.ami_id
   instance_type = "m7i-flex.xlarge"  # Tăng size để chạy nhiều model
 
@@ -103,7 +103,7 @@ resource "aws_security_group" "rag_sg" {
 }
 
 resource "aws_ebs_volume" "model_storage" {
-  availability_zone = aws_instance.rag_server.availability_zone
+  availability_zone = aws_instance.rag_backend.availability_zone
   size             = 40
   type             = "gp3"
   iops             = 3000
@@ -117,7 +117,7 @@ resource "aws_ebs_volume" "model_storage" {
 resource "aws_volume_attachment" "model_attach" {
   device_name = "/dev/xvdf"
   volume_id   = aws_ebs_volume.model_storage.id
-  instance_id = aws_instance.rag_server.id
+  instance_id = aws_instance.rag_backend.id
 }
 
 # Add ECR Repository

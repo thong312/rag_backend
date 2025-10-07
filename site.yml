@@ -1,6 +1,6 @@
 ---
 - name: Deploy RAG Application
-  hosts: rag_servers
+  hosts: rag_backend
   become: yes
   vars:
     app_dir: /opt/rag-app
