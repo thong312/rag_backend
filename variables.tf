@@ -17,7 +17,7 @@ variable "ecr_registry" {
 variable "ecr_repository" {
   description = "ECR repository name for the RAG backend image"
   type        = string
-  default     = "rag-backend"
+  default     = "rag_backend"
 }
 
 variable "image_tag" {
