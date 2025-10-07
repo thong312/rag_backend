@@ -15,10 +15,20 @@ jobs:
       - aws-cli/setup
       - terraform/install
       
-      # Build and push Docker image
+      # Add ECR authentication steps
+      - run:
+        name: Login to ECR
+        command: |
+          echo "Logging in to ECR..."
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      # Build and push Docker image with explicit region and registry
       - aws-ecr/build-and-push-image:
           repo: ${ECR_REPOSITORY}
           tag: 'latest'
+          region: ${AWS_REGION}
+          registry-id: ${AWS_ACCOUNT_ID}
       
       # Initialize and apply Terraform
       - run:
