@@ -2,6 +2,10 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "docker"{
+  host = "unix:///var/run/docker.sock"
+}
+
 resource "aws_instance" "rag_backend" {
   ami           = var.ami_id
   instance_type = "m7i-flex.xlarge"  # Tăng size để chạy nhiều model
